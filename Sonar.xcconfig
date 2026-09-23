@@ -1,0 +1,15 @@
+// Xcode build configuration for developing Sonar.
+//
+// Apply this file once in Xcode to get mic permission and the correct
+// bundle identifier when running the app with ⌘R:
+//   1. Click the project root in the Navigator (the "Sonar" package icon).
+//   2. Select the Sonar target → Build Settings.
+//   3. Under "Configurations", set this file for the Debug configuration.
+//
+// The build script (./script/build_and_run.sh) does not use this file.
+
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_KEY_NSMicrophoneUsageDescription = Sonar listens for reflections of its test tone to detect hand movement. Audio is not saved.
+PRODUCT_BUNDLE_IDENTIFIER = com.emanuel.sonarlab
+MARKETING_VERSION = 0.1.4
+CURRENT_PROJECT_VERSION = 11

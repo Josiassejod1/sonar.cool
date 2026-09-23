@@ -11,6 +11,7 @@ let package = Package(
             name: "Sonar",
             path: ".",
             sources: ["work/Sonar"],
+            exclude: ["work/Sonar/Info.plist"],
             resources: [
                 .copy("assets/zoom"),
                 .copy("assets/gallery"),
