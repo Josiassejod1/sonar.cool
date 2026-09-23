@@ -26,6 +26,10 @@ let package = Package(
                 .linkedFramework("PDFKit"),
                 .linkedFramework("Carbon"),
                 .linkedFramework("ApplicationServices"),
+                // Embed the shared Info.plist so Xcode builds report the version
+                // and include the microphone usage description.
+                .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT",
+                              "-Xlinker", "__info_plist", "-Xlinker", "script/Info.plist"]),
             ]
         )
     ]

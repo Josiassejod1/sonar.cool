@@ -32,15 +32,9 @@ xed .
 
 Xcode gives you autocomplete, jump-to-definition, and inline errors while editing.
 
-**One-time setup to run with ⌘R:** Apply `Sonar.xcconfig` to the Sonar target so Xcode generates an Info.plist with microphone permission.
+Press **⌘R** to run. The Xcode build shares `script/Info.plist` with the build script, so it reports the same version and asks for microphone access.
 
-1. Open the project with `xed .`
-2. Click the **Sonar** package in the Navigator
-3. Select the **Sonar** target → **Build Settings**
-4. Under **Configurations**, set `Sonar.xcconfig` for the Debug configuration
-5. Press **⌘R** — macOS will prompt for microphone access on first launch
-
-Two cosmetic items are not available in the Xcode build: the generated app icon and the logo mark in the sidebar. These are produced by the build script and are not source files. Everything else — gestures, audio, diagnostics — works normally.
+Two cosmetic items are not available in the Xcode build: the generated app icon and the logo mark in the sidebar. These are produced by the build script. Controlling other apps needs Accessibility access, which is simplest to grant to the app the build script installs.
 
 Use the build script for a release-quality build with full icons and signing. Use Xcode for day-to-day editing and development runs.
 
