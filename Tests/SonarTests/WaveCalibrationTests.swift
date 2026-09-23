@@ -2,6 +2,9 @@ import XCTest
 import SonarCore
 
 final class WaveCalibrationTests: XCTestCase {
+    // 20 ms per synthetic frame — matches the detector's expected real-time cadence.
+    private let dt = 0.02
+
     // Convenience builder for synthetic Doppler frames.
     private func reading(strength: Float, bands: [Double], snr: Float = 40) -> Reading {
         Reading(spectrum: [], baseline: [], direction: "Mixed movement",
@@ -15,7 +18,7 @@ final class WaveCalibrationTests: XCTestCase {
     // Feed `count` quiet frames to arm the detector (requires 220 ms silence).
     private func arm(_ detector: inout ImmediateWave, frames: Int = 12) {
         for frame in 0..<frames {
-            _ = detector.feed(quietReading(), now: Double(frame) * 0.02)
+            _ = detector.feed(quietReading(), now: Double(frame) * dt)
         }
     }
 
@@ -30,7 +33,7 @@ final class WaveCalibrationTests: XCTestCase {
                 var bands = [Double](repeating: 0, count: 8)
                 if active { bands[2] = log1p(1 - sign * 0.6); bands[5] = log1p(1 + sign * 0.6) }
                 let r = reading(strength: active ? 0.00025 : 0, bands: bands)
-                XCTAssertNil(detector.feed(r, now: Double(frame) * 0.02),
+                XCTAssertNil(detector.feed(r, now: Double(frame) * dt),
                              "Weak signal must not produce a swipe (sign \(sign))")
             }
         }
@@ -45,7 +48,7 @@ final class WaveCalibrationTests: XCTestCase {
                 var bands = [Double](repeating: 0, count: 8)
                 if active { bands[2] = log1p(1 - sign * 0.25); bands[5] = log1p(1 + sign * 0.25) }
                 let r = reading(strength: active ? 0.004 : 0, bands: bands)
-                XCTAssertNil(detector.feed(r, now: Double(frame) * 0.02),
+                XCTAssertNil(detector.feed(r, now: Double(frame) * dt),
                              "Ambiguous balance must not produce a swipe (sign \(sign))")
             }
         }
@@ -55,7 +58,7 @@ final class WaveCalibrationTests: XCTestCase {
         var wave = ImmediateWave()
         for frame in 0..<100 {
             let r = reading(strength: frame > 20 ? 0.004 : 0, bands: [1, 1, 1, 1, 1, 1, 1, 1])
-            XCTAssertNil(wave.feed(r, now: Double(frame) * 0.02),
+            XCTAssertNil(wave.feed(r, now: Double(frame) * dt),
                          "Symmetric motion must not produce a direction")
         }
     }
@@ -72,7 +75,7 @@ final class WaveCalibrationTests: XCTestCase {
                 var bands = [Double](repeating: 0, count: 8)
                 if motion { bands[value > 0 ? 5 : 2] = 2 }
                 let r = reading(strength: motion ? 0.004 : 0, bands: bands)
-                if let event = wave.feed(r, now: Double(frame) * 0.02) { events.append(event) }
+                if let event = wave.feed(r, now: Double(frame) * dt) { events.append(event) }
             }
             XCTAssertEqual(events, [sign > 0 ? "next" : "previous"],
                            "Swipe + return suppression failed (sign \(sign))")
@@ -87,7 +90,7 @@ final class WaveCalibrationTests: XCTestCase {
             var fired: [String] = []
             var times: [Double] = []
             for frame in 0..<120 {
-                let t = Double(frame) * 0.02
+                let t = Double(frame) * dt
                 let forward = (0.3..<0.44).contains(t) || (1.6..<1.74).contains(t)
                 let returning = (0.70..<0.90).contains(t)
                 var bands = [Double](repeating: 0, count: 8)
@@ -99,8 +102,10 @@ final class WaveCalibrationTests: XCTestCase {
             let expected = sign > 0 ? "next" : "previous"
             XCTAssertEqual(fired, [expected, expected],
                            "Return stroke suppression or re-arm failed (sign \(sign))")
-            XCTAssertTrue(times.count == 2 && times[0] <= 0.38,
-                          "Initial response too slow (sign \(sign))")
+            XCTAssertEqual(times.count, 2, "Expected exactly 2 events (sign \(sign))")
+            if times.count >= 1 {
+                XCTAssertLessThanOrEqual(times[0], 0.38, "Initial response too slow (sign \(sign))")
+            }
         }
     }
 
@@ -115,7 +120,7 @@ final class WaveCalibrationTests: XCTestCase {
                 var bands = [Double](repeating: 0, count: 8)
                 if active { bands[2] = log1p(1 - balance); bands[5] = log1p(1 + balance) }
                 let r = reading(strength: active ? 0.004 : 0, bands: bands)
-                if let event = detector.feed(r, now: Double(frame) * 0.02) { fired.append(event) }
+                if let event = detector.feed(r, now: Double(frame) * dt) { fired.append(event) }
             }
             XCTAssertEqual(fired, [sign > 0 ? "next" : "previous"],
                            "Opposite precursor cancelled coherent swipe (sign \(sign))")
@@ -133,7 +138,7 @@ final class WaveCalibrationTests: XCTestCase {
             let r = Reading(spectrum: [], baseline: [], direction: "Calibrating",
                             carrierDB: 0, snr: 40, strength: 0.01,
                             waveBands: [0, 0, 0, 0, 2, 2, 2, 2])
-            XCTAssertNil(detector.feed(r, now: Double(frame) * 0.02),
+            XCTAssertNil(detector.feed(r, now: Double(frame) * dt),
                          "Calibrating state must block swipe detection")
         }
     }

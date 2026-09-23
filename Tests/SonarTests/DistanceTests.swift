@@ -30,7 +30,7 @@ final class DistanceTests: XCTestCase {
 
     // MARK: - RangeAnalyzer end-to-end
 
-    func makeFrame(analyzer: RangeAnalyzer, echoCm: Double?, frame: Int) -> [Float] {
+    private func makeFrame(analyzer: RangeAnalyzer, echoCm: Double?, frame: Int) -> [Float] {
         let rate = analyzer.rate
         return (0..<analyzer.n).map { k in
             let t = Double(k + frame * analyzer.hop) / rate - 0.012
@@ -52,14 +52,14 @@ final class DistanceTests: XCTestCase {
             "Silence must not produce distance"
         )
 
-        // Calibration: feed direct chirp with no echo for 55 frames.
+        // Calibration: warmup takes ceil(3 / period) = 50 frames; feed 55 to clear it safely.
         var reading = RangeReading(profile: [], cm: nil, quality: 0, status: "")
         for frame in 0..<55 {
             reading = analyzer.analyze(makeFrame(analyzer: analyzer, echoCm: nil, frame: frame))
         }
         XCTAssertNil(reading.cm, "Static baseline must not produce distance")
 
-        // Echo detection at 10, 20, 30 cm.
+        // Echo detection at 10, 20, 30 cm: feed 7 frames (≥ 3 needed for stability lock).
         for expectedCm in [10.0, 20.0, 30.0] {
             for frame in 55..<62 {
                 reading = analyzer.analyze(makeFrame(analyzer: analyzer, echoCm: expectedCm, frame: frame))
@@ -71,7 +71,7 @@ final class DistanceTests: XCTestCase {
             }
         }
 
-        // Lost echo must clear the displayed distance.
+        // Lost echo: one frame without an echo after stability lock must clear the distance.
         reading = analyzer.analyze(makeFrame(analyzer: analyzer, echoCm: nil, frame: 63))
         XCTAssertNil(reading.cm, "Lost echo must clear distance")
     }

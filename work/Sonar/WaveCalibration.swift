@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(SonarCore)
 import SonarCore
+#endif
 
 // Retain the existing integration name; no templates or recording are used.
 final class WaveCalibration: ObservableObject {

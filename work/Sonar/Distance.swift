@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(SonarCore)
 import SonarCore
+#endif
 
 struct RangeFrame {
     let time: Double

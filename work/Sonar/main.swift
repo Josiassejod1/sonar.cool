@@ -15,7 +15,9 @@ import CoreAudio
 import PDFKit
 import ApplicationServices
 import Combine
+#if canImport(SonarCore)
 import SonarCore
+#endif
 
 // Passive pulse detector: it never changes scroll velocity or waits to release it.
 struct DoublePushDetector {

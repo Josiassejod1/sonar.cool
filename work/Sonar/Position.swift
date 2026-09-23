@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(SonarCore)
 import SonarCore
+#endif
 
 final class PositionModel: ObservableObject {
     @Published var left=RangeReading(profile:[],cm:nil,quality:0,status:"Stopped")
