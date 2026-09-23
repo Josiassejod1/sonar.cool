@@ -1,6 +1,7 @@
 import Foundation
 import AudioToolbox
 import CoreAudio
+import SonarCore
 
 // Independent AUHAL endpoints: a microphone-only device cannot be assigned
 // to an audio unit whose speaker output is also enabled.

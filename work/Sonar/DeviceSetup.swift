@@ -3,6 +3,7 @@ import SwiftUI
 import AVFoundation
 import CoreAudio
 import CryptoKit
+import SonarCore
 import UniformTypeIdentifiers
 
 // Frozen after a separate resting sample; never learns from intentional motion.

@@ -1,4 +1,5 @@
 import SwiftUI
+import SonarCore
 
 struct SignalFrame {
     let time: Double
