@@ -52,10 +52,9 @@ trap cleanup EXIT
 
 # ── banner ────────────────────────────────────────────────────────────────────
 printf '\n'
-printf "  ${BOLD}${CYAN} ____  ___  _  _  __   ____${RESET}\n"
-printf "  ${BOLD}${CYAN}/ ___)(  _)( \( )/ _\ (  _ \\${RESET}\n"
-printf "  ${BOLD}${CYAN}\___ \ ) _) )  ((  O ) )   /${RESET}\n"
-printf "  ${BOLD}${CYAN}(____/(___)(_\_) \__/(__\_)${RESET}\n"
+printf "  ${BOLD}${CYAN}╔═╗ ╔═╗ ╔╗╔ ╔═╗ ╦═╗${RESET}\n"
+printf "  ${BOLD}${CYAN}╚═╗ ║ ║ ║╚╗ ╠═╣ ╠╦╝${RESET}\n"
+printf "  ${BOLD}${CYAN}╚═╝ ╚═╝ ╝ ╚ ╩ ╩ ╩╚═${RESET}\n"
 printf '\n'
 printf "  ${DIM}gesture control for macOS${RESET}\n"
 printf '\n'
