@@ -16,6 +16,7 @@ _SPIN_PID=''
 _SPIN_MSG=''
 _STEP_N=0
 _STEP_TOTAL=8
+_STEP_DONE=1   # start "done" so an early ERR before the first step is a no-op
 
 _spin_loop() {
   local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' i=0
@@ -30,36 +31,55 @@ _spin_loop() {
 step() {
   _STEP_N=$(( _STEP_N + 1 ))
   _SPIN_MSG="$1"
-  _spin_loop &
-  _SPIN_PID=$!
+  _STEP_DONE=0
+  if [[ -t 1 ]]; then
+    _spin_loop &
+    _SPIN_PID=$!
+  else
+    printf "  [%d/%d]  %s" "$_STEP_N" "$_STEP_TOTAL" "$_SPIN_MSG"
+  fi
 }
 
 ok() {
-  [[ -n "$_SPIN_PID" ]] && { kill "$_SPIN_PID" 2>/dev/null; wait "$_SPIN_PID" 2>/dev/null || :; _SPIN_PID=''; }
-  printf "\r  ${DIM}[%d/%d]${RESET}  %-42s ${GREEN}✓${RESET}\n" "$_STEP_N" "$_STEP_TOTAL" "$_SPIN_MSG"
+  _STEP_DONE=1
+  if [[ -n "$_SPIN_PID" ]]; then
+    kill "$_SPIN_PID" 2>/dev/null; wait "$_SPIN_PID" 2>/dev/null || :; _SPIN_PID=''
+    printf "\r  ${DIM}[%d/%d]${RESET}  %-42s ${GREEN}✓${RESET}\n" "$_STEP_N" "$_STEP_TOTAL" "$_SPIN_MSG"
+  else
+    printf " ${GREEN}ok${RESET}\n"
+  fi
 }
 
 fail() {
-  [[ -n "$_SPIN_PID" ]] && { kill "$_SPIN_PID" 2>/dev/null; wait "$_SPIN_PID" 2>/dev/null || :; _SPIN_PID=''; }
-  printf "\r  ${DIM}[%d/%d]${RESET}  %-42s ${RED}✗${RESET}\n" "$_STEP_N" "$_STEP_TOTAL" "$_SPIN_MSG"
+  [[ "$_STEP_DONE" == 1 ]] && return 0  # idempotent — don't double-print
+  _STEP_DONE=1
+  if [[ -n "$_SPIN_PID" ]]; then
+    kill "$_SPIN_PID" 2>/dev/null; wait "$_SPIN_PID" 2>/dev/null || :; _SPIN_PID=''
+    printf "\r  ${DIM}[%d/%d]${RESET}  %-42s ${RED}✗${RESET}\n" "$_STEP_N" "$_STEP_TOTAL" "$_SPIN_MSG"
+  else
+    printf " ${RED}FAILED${RESET}\n"
+  fi
 }
 
 cleanup() {
   [[ -n "$_SPIN_PID" ]] && { kill "$_SPIN_PID" 2>/dev/null; wait "$_SPIN_PID" 2>/dev/null || :; }
-  [[ -n "$SONAR_STAGE" ]] && rm -rf "$SONAR_STAGE"
+  [[ -n "$SONAR_STAGE" ]] && rm -rf "$SONAR_STAGE" || true
 }
 trap cleanup EXIT
+trap 'fail' ERR   # safety net: any unhandled failure marks the active step ✗
 
 # ── banner ────────────────────────────────────────────────────────────────────
-printf '\n'
-printf "  ${BOLD}${CYAN}╔═╗ ╔═╗ ╔╗╔ ╔═╗ ╦═╗${RESET}\n"
-printf "  ${BOLD}${CYAN}╚═╗ ║ ║ ║╚╗ ╠═╣ ╠╦╝${RESET}\n"
-printf "  ${BOLD}${CYAN}╚═╝ ╚═╝ ╝ ╚ ╩ ╩ ╩╚═${RESET}\n"
-printf '\n'
-printf "  ${DIM}gesture control for macOS${RESET}\n"
-printf '\n'
-printf "  ${DIM}────────────────────────────────${RESET}\n"
-printf '\n'
+if [[ -t 1 ]]; then
+  printf '\n'
+  printf "  ${BOLD}${CYAN}╔═╗ ╔═╗ ╔╗╔ ╔═╗ ╦═╗${RESET}\n"
+  printf "  ${BOLD}${CYAN}╚═╗ ║ ║ ║╚╗ ╠═╣ ╠╦╝${RESET}\n"
+  printf "  ${BOLD}${CYAN}╚═╝ ╚═╝ ╝ ╚ ╩ ╩ ╩╚═${RESET}\n"
+  printf '\n'
+  printf "  ${DIM}gesture control for macOS${RESET}\n"
+  printf '\n'
+  printf "  ${DIM}────────────────────────────────${RESET}\n"
+  printf '\n'
+fi
 
 # ── build ─────────────────────────────────────────────────────────────────────
 SONAR_STAGE=$(mktemp -d /private/tmp/sonar-build.XXXXXX)
@@ -134,8 +154,12 @@ step "Signing app"
 SONAR_SIGNING_IDENTITY="${SONAR_SIGNING_IDENTITY:--}"
 codesign --force --entitlements script/Sonar.entitlements \
   --sign "$SONAR_SIGNING_IDENTITY" --identifier com.emanuel.sonarlab \
-  "$SONAR_APP" >/dev/null 2>&1
-codesign --verify --strict "$SONAR_APP" >/dev/null 2>&1
+  "$SONAR_APP" >"$SONAR_STAGE/codesign.log" 2>&1 || {
+    fail; cat "$SONAR_STAGE/codesign.log" >&2; exit 1
+  }
+codesign --verify --strict "$SONAR_APP" >>"$SONAR_STAGE/codesign.log" 2>&1 || {
+  fail; cat "$SONAR_STAGE/codesign.log" >&2; exit 1
+}
 ok
 
 step "Running self-tests"
@@ -147,11 +171,13 @@ SONAR_TEST_STATUS=0
 if [[ "$SONAR_TEST_STATUS" != 1 ]] || \
    ! /usr/bin/grep -q 'Intentional clean-exit probe' "$SONAR_STAGE/failure-probe.log"; then
   fail
-  cat "$SONAR_STAGE/failure-probe.log"
-  printf "  ${RED}Test failure handling did not exit cleanly; keeping the installed app.${RESET}\n"
+  cat "$SONAR_STAGE/failure-probe.log" >&2
+  printf "  ${RED}Test failure handling did not exit cleanly; keeping the installed app.${RESET}\n" >&2
   exit 1
 fi
-"$SONAR_APP/Contents/MacOS/Sonar" --self-test >/dev/null 2>&1
+"$SONAR_APP/Contents/MacOS/Sonar" --self-test >"$SONAR_STAGE/self-test.log" 2>&1 || {
+  fail; cat "$SONAR_STAGE/self-test.log" >&2; exit 1
+}
 ok
 
 step "Packaging build"
@@ -162,9 +188,11 @@ ditto --noextattr --norsrc "$SONAR_APP" "outputs/Sonar Classic.app"
 ditto -c -k --keepParent --noextattr "outputs/Sonar Classic.app" "outputs/Sonar Classic.zip"
 ok
 
-printf '\n'
-printf "  ${DIM}────────────────────────────────${RESET}\n"
-printf '\n'
+if [[ -t 1 ]]; then
+  printf '\n'
+  printf "  ${DIM}────────────────────────────────${RESET}\n"
+  printf '\n'
+fi
 
 if [[ "${1:-}" == "--build-only" ]]; then
   printf "  ${GREEN}${BOLD}✓  Built and tested:${RESET}  outputs/Sonar Classic.app\n\n"
@@ -174,14 +202,15 @@ fi
 # ── install ───────────────────────────────────────────────────────────────────
 _STEP_N=0
 _STEP_TOTAL=3
-printf "  ${BOLD}Installing${RESET}\n\n"
+_STEP_DONE=1
+if [[ -t 1 ]]; then printf "  ${BOLD}Installing${RESET}\n\n"; fi
 
 SONAR_INSTALLED_APP="${SONAR_INSTALL_PATH:-$HOME/Applications/Sonar Classic.app}"
 
 # Do not silently replace a certificate-signed installation with an ad-hoc build.
 if [[ -d "$SONAR_INSTALLED_APP" && "$SONAR_SIGNING_IDENTITY" == "-" ]] && \
    codesign -dv "$SONAR_INSTALLED_APP" 2>&1 | /usr/bin/grep -q '^Authority='; then
-  printf "  ${RED}✗  Set SONAR_SIGNING_IDENTITY to the existing certificate before replacing this installation.${RESET}\n\n"
+  printf "  ${RED}✗  Set SONAR_SIGNING_IDENTITY to the existing certificate before replacing this installation.${RESET}\n\n" >&2
   exit 1
 fi
 
@@ -218,9 +247,11 @@ else
 fi
 ok
 
-printf '\n'
-printf "  ${DIM}────────────────────────────────${RESET}\n"
-printf "  ${GREEN}${BOLD}✓  Sonar is running.${RESET}\n\n"
+if [[ -t 1 ]]; then
+  printf '\n'
+  printf "  ${DIM}────────────────────────────────${RESET}\n"
+  printf "  ${GREEN}${BOLD}✓  Sonar is running.${RESET}\n\n"
+fi
 
 if [[ "${1:-}" == "--verify" ]]; then
   sleep 1
